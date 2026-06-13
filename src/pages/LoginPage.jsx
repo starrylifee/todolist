@@ -1,11 +1,15 @@
-import { Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
-  const { currentUser, loading, loginWithGoogle } = useAuth();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { currentUser, loading: authLoading, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
 
-  // 로딩 중일 때 (리다이렉트 결과 처리 중)
-  if (loading) {
+  // 로딩 중 (인증 상태 확인 중)
+  if (authLoading) {
     return (
       <div className="auth-page">
         <div className="auth-container">
@@ -23,8 +27,22 @@ export default function LoginPage() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleGoogleLogin = () => {
-    loginWithGoogle();
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithGoogle();
+      navigate('/dashboard');
+    } catch (err) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('로그인이 취소되었습니다.');
+      } else {
+        setError('로그인에 실패했습니다. 다시 시도하세요.');
+        console.error('Google 로그인 에러:', err);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -39,10 +57,13 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-form">
+          {error && <div className="alert alert-error">{error}</div>}
+
           <button
             id="google-login"
             className="btn-google"
             onClick={handleGoogleLogin}
+            disabled={loading}
           >
             <svg className="google-icon" viewBox="0 0 24 24" width="20" height="20">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -50,7 +71,7 @@ export default function LoginPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Google로 로그인
+            {loading ? '로그인 중...' : 'Google로 로그인'}
           </button>
         </div>
 
