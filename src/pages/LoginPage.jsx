@@ -1,7 +1,27 @@
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
-  const { loginWithGoogle } = useAuth();
+  const { currentUser, loading, loginWithGoogle } = useAuth();
+
+  // 로딩 중일 때 (리다이렉트 결과 처리 중)
+  if (loading) {
+    return (
+      <div className="auth-page">
+        <div className="auth-container">
+          <div className="loading-screen">
+            <div className="loading-spinner"></div>
+            <p>로그인 확인 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 이미 로그인되어 있으면 대시보드로 이동
+  if (currentUser) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleGoogleLogin = () => {
     loginWithGoogle();
