@@ -2,7 +2,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function Header() {
-  const { currentUser, userRole, logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -14,8 +14,6 @@ export default function Header() {
     }
   };
 
-  const roleBadgeText = userRole === 'teacher' ? '교사' : '학생';
-
   return (
     <header className="app-header">
       <div className="header-left">
@@ -25,10 +23,17 @@ export default function Header() {
         </h1>
       </div>
       <div className="header-right">
-        <span className="role-badge" data-role={userRole}>
-          {roleBadgeText}
-        </span>
-        <span className="user-email">{currentUser?.email}</span>
+        <div className="user-profile">
+          {currentUser?.photoURL && (
+            <img
+              className="user-avatar"
+              src={currentUser.photoURL}
+              alt="프로필"
+              referrerPolicy="no-referrer"
+            />
+          )}
+          <span className="user-name">{currentUser?.displayName || currentUser?.email}</span>
+        </div>
         <button
           id="logout-button"
           className="btn btn-ghost"

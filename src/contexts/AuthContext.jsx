@@ -1,12 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-} from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth, googleProvider, db } from '../firebase';
 
 const AuthContext = createContext(null);
 
@@ -20,44 +15,26 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 교사 로그인
-  async function loginAsTeacher(email, password) {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // Firestore에서 역할 확인
-    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-    if (userDoc.exists() && userDoc.data().role === 'teacher') {
-      return userCredential;
-    }
-    // 교사가 아니면 로그아웃
-    await signOut(auth);
-    throw new Error('교사 계정이 아닙니다.');
-  }
+  // Google 로그인
+  async function loginWithGoogle() {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
 
-  // 학생 회원가입
-  async function signupAsStudent(email, password, displayName) {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    // Firestore에 사용자 정보 저장
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
-      email,
-      displayName,
-      role: 'student',
-      createdAt: new Date().toISOString(),
-    });
-    return userCredential;
-  }
-
-  // 학생 로그인
-  async function loginAsStudent(email, password) {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-    if (userDoc.exists() && userDoc.data().role === 'student') {
-      return userCredential;
+    // Firestore에 사용자 정보 저장 (첫 로그인 시)
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) {
+      await setDoc(userDocRef, {
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        createdAt: new Date().toISOString(),
+      });
     }
-    await signOut(auth);
-    throw new Error('학생 계정이 아닙니다.');
+
+    return result;
   }
 
   // 로그아웃
@@ -66,18 +43,8 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        // Firestore에서 역할 가져오기
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserRole(userDoc.data().role);
-        }
-      } else {
-        setCurrentUser(null);
-        setUserRole(null);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
       setLoading(false);
     });
 
@@ -86,11 +53,8 @@ export function AuthProvider({ children }) {
 
   const value = {
     currentUser,
-    userRole,
     loading,
-    loginAsTeacher,
-    signupAsStudent,
-    loginAsStudent,
+    loginWithGoogle,
     logout,
   };
 
