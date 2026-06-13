@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+} from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../firebase';
 
@@ -17,24 +22,9 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Google 로그인
-  async function loginWithGoogle() {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-
-    // Firestore에 사용자 정보 저장 (첫 로그인 시)
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-    if (!userDoc.exists()) {
-      await setDoc(userDocRef, {
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-        createdAt: new Date().toISOString(),
-      });
-    }
-
-    return result;
+  // Google 로그인 (리다이렉트 방식)
+  function loginWithGoogle() {
+    return signInWithRedirect(auth, googleProvider);
   }
 
   // 로그아웃
@@ -43,6 +33,27 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    // 리다이렉트 결과 처리
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          const user = result.user;
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('리다이렉트 로그인 에러:', error);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
